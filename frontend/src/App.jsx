@@ -1,43 +1,33 @@
 import React, { useState } from "react";
+import Home from "./components/Home";
 import ResumeReview from "./components/ResumeReview";
-import MockInterview from "./components/MockInterview";
-import CompanyResearch from "./components/CompanyResearch";
+import InternshipPrep from "./components/InternshipPrep";
 
 export default function App() {
-  const [tab, setTab] = useState("resume");
+  const [page, setPage] = useState("home");
+  const [internshipInfo, setInternshipInfo] = useState("");
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <nav className="flex gap-4 mb-6">
-        <button
-          onClick={() => setTab("resume")}
-          className={`px-4 py-2 rounded ${
-            tab === "resume" ? "bg-blue-600 text-white" : "bg-gray-300"
-          }`}
-        >
-          Resume Review
-        </button>
-        <button
-          onClick={() => setTab("mock")}
-          className={`px-4 py-2 rounded ${
-            tab === "mock" ? "bg-green-600 text-white" : "bg-gray-300"
-          }`}
-        >
-          Mock Interview
-        </button>
-        <button
-          onClick={() => setTab("company")}
-          className={`px-4 py-2 rounded ${
-            tab === "company" ? "bg-purple-600 text-white" : "bg-gray-300"
-          }`}
-        >
-          Company Research
-        </button>
-      </nav>
+  const renderPage = () => {
+    switch (page) {
+      case "resume-review":
+        return <ResumeReview onBack={() => setPage("home")} />;
+      case "internship-prep":
+        return (
+          <InternshipPrep
+            internshipInfo={internshipInfo}
+            setInternshipInfo={setInternshipInfo}
+            onBack={() => setPage("home")}
+          />
+        );
+      default:
+        return (
+          <Home
+            onSelectResumeReview={() => setPage("resume-review")}
+            onSelectInternshipPrep={() => setPage("internship-prep")}
+          />
+        );
+    }
+  };
 
-      {tab === "resume" && <ResumeReview />}
-      {tab === "mock" && <MockInterview />}
-      {tab === "company" && <CompanyResearch />}
-    </div>
-  );
+  return <div style={{ maxWidth: 600, margin: "auto", padding: 20 }}>{renderPage()}</div>;
 }

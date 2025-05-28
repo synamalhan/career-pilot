@@ -1,48 +1,45 @@
 import React, { useState } from "react";
-import { uploadResume } from "../api/apiClient";
+import DragDropFile from "./DragDropFile";
+import { uploadResume } from "../apiClient";
 
-export default function ResumeReview() {
+export default function ResumeReview({ onBack }) {
   const [file, setFile] = useState(null);
-  const [feedback, setFeedback] = useState("");
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const handleUpload = async () => {
-    if (!file) return alert("Please upload a resume file");
+   const centerContainer = {
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "flex-start",  // Align near top vertically
+  alignItems: "center",          // Center horizontally
+  minHeight: "80vh", 
+    width: "100vw",                // full viewport width
+  paddingTop: "100px",            // Push content a bit down from top
+  textAlign: "center",
+
+};
+  const handleUpload = async (file) => {
     setLoading(true);
-    setError(null);
     try {
       const response = await uploadResume(file);
-      setFeedback(JSON.stringify(response.data, null, 2)); // Adjust to your backend response
+      setResult(`Resume uploaded: ${response.data.filename}`);
     } catch (err) {
-      setError("Failed to upload resume");
+      setResult("Upload failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <h2 className="text-2xl font-semibold mb-4">Resume Review</h2>
-      <input
-        type="file"
-        accept=".pdf,.doc,.docx"
-        onChange={(e) => setFile(e.target.files[0])}
-        className="mb-4"
-      />
-      <button
-        onClick={handleUpload}
-        disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-      >
-        {loading ? "Uploading..." : "Submit Resume"}
+    <div style={centerContainer}>
+      <button onClick={onBack} style={{ marginBottom: 20 }}>
+        &larr; Back
       </button>
-
-      {error && <p className="text-red-600 mt-2">{error}</p>}
-      {feedback && (
-        <pre className="bg-gray-100 p-4 mt-4 whitespace-pre-wrap rounded">
-          {feedback}
-        </pre>
-      )}
+      <h1>CareerPilot</h1>
+      <h3>Review your Resume</h3>
+      <DragDropFile onFileSelect={handleUpload} />
+      {loading && <p>Uploading and analyzing...</p>}
+      {result && <div style={{ marginTop: 20 }}>{result}</div>}
     </div>
   );
 }
