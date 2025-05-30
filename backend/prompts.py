@@ -67,7 +67,20 @@ Below is a list of mock interview questions and the candidate's corresponding an
 - Whether the answer is specific, relevant, and compelling.
 
 Present your feedback question by question in a clear format.
-
+give response in this format:
+{{
+  "question_1": {{
+    "feedback": "",
+    "improvement": "",
+    "specificity": ""
+  }},
+  "question_2": {{
+    "feedback": "",
+    "improvement": "",
+    "specificity": ""
+  }},
+  ...
+}}
 Questions and Answers:
 {qa_pairs}
 """

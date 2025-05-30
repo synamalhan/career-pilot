@@ -7,6 +7,7 @@ import {
   fetchMockFeedback
 } from "../apiClient";
 import ResumeFeedback from "./ResumeFeedback";
+import { Feed } from "@mui/icons-material";
 
 export default function InternshipPrep({ onBack }) {
   const [showOptions, setShowOptions] = useState(false);
@@ -19,6 +20,9 @@ export default function InternshipPrep({ onBack }) {
   // New fields for role & company for all API calls
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
+  // Add this state near the top if not already present:
+const [feedbackById, setFeedbackById] = useState({});
+
 
   const centerContainer = {
     display: "flex",
@@ -144,8 +148,7 @@ const handleMockInterview = async () => {
 };
 
 
-  // Submit user answers to /mock-feedback API
-const handleMockFeedbackSubmit = async () => {
+  const handleMockFeedbackSubmit = async () => {
   if (Object.keys(userAnswers).length === 0) {
     setError("Please answer at least one question before submitting.");
     return;
@@ -156,24 +159,51 @@ const handleMockFeedbackSubmit = async () => {
   setIdealAnswers(null);
 
   try {
-    // Transform userAnswers into responses array
     const responses = Object.entries(userAnswers).map(([question, answer]) => ({
       question,
       answer,
     }));
 
+    console.log("Submitting responses:", responses);
+
     const response = await fetchMockFeedback(company, role, responses);
 
-    // Assume response.data contains idealAnswers keyed by question ids
-    setIdealAnswers(response.data.idealAnswers || {});
-  } catch (err) {
-    setError("Failed to fetch ideal answers.");
-    console.error(err);
+    console.log("Full API response:", response);
+
+    const feedbackRaw = response?.data?.feedback;
+
+console.log("Raw feedback (string):", feedbackRaw);
+
+let parsedFeedback = {};
+try {
+  const feedbackObj = JSON.parse(feedbackRaw); // ✅ PARSE THE STRING
+  console.log("Parsed feedback object:", feedbackObj);
+
+  for (const [id, fb] of Object.entries(feedbackObj)) {
+    parsedFeedback[id] = {
+      feedback: fb.feedback || "",
+      improvement: fb.improvement || "",
+      specificity: fb.specificity || "",
+    };
+    console.log(`Feedback for ${id}:`, parsedFeedback[id]);
   }
 
-  setLoading(false);
+  setFeedbackById(parsedFeedback);
+  console.log("Final feedbackById set:", parsedFeedback);
+} catch (err) {
+  console.error("Failed to parse feedback JSON:", e);
+  setError("Failed to parse feedback from the server.");
+  return;
+}
+    setIdealAnswers(response.data.ideal_answers || null);   
+  console.log("Ideal answers:", response.data.ideal_answers);
+  } catch (err) {
+    setError("Failed to submit answers or fetch feedback.");
+    console.error("API error:", err);
+  } finally {
+    setLoading(false);
+  }
 };
-
 
   const parseCompanyResearch = (data) => {
   try {
@@ -457,32 +487,41 @@ const handleMockFeedbackSubmit = async () => {
               {section === "TQ" ? "Technical Questions" : section === "BQ" ? "Behavioral Questions" : "Case Study"}
             </h3>
             {mockQuestionsParsed[section].map(({ id, question }) => (
-              <div key={id} style={{ marginBottom: 15, textAlign: "left" }}>
-                <p><b>{id}</b>: {typeof question === "object" ? JSON.stringify(question) : question}</p>
-                <textarea
-                  rows={4}
-                  placeholder="Your answer..."
-                  style={{
-                    width: "100%",
-                    padding: 10,
-                    fontSize: 14,
-                    borderRadius: 6,
-                    borderColor: "#ccc",
-                    marginTop: 5,
-                  }}
-                  value={userAnswers[id] || ""}
-                  onChange={(e) => handleAnswerChange(id, e.target.value)}
-                />
-                {idealAnswers?.[id] && (
-  <p style={{ marginTop: 5, backgroundColor: "#f3f4f6", padding: 10, borderRadius: 5 }}>
-    <i>💡 Ideal Answer:</i> {idealAnswers[id]}
-  </p>
-)}
+  <div key={id} style={{ marginBottom: 15, textAlign: "left" }}>
+    <p><b>{id}</b>: {typeof question === "object" ? JSON.stringify(question) : question}</p>
+    <textarea
+      rows={4}
+      placeholder="Your answer..."
+      style={{
+        width: "100%",
+        padding: 10,
+        fontSize: 14,
+        borderRadius: 6,
+        borderColor: "#ccc",
+        marginTop: 5,
+      }}
+      value={userAnswers[id] || ""}
+      onChange={(e) => handleAnswerChange(id, e.target.value)}
+    />
 
-              </div>
+    {feedbackById?.[id] && (
+      <div style={{
+        backgroundColor: "rgba(59, 130, 246, 0.1)", // blue with low opacity
+        padding: 10,
+        borderRadius: 5,
+        marginTop: 8,
+        lineHeight: 1.5,
+      }}>
+        <p><strong>📣 Feedback:</strong> {feedbackById[id].feedback}</p>
+        <p><strong>🔧 How to Improve:</strong> {feedbackById[id].improvement}</p>
+        <p><strong>🎯 Specificity:</strong> {feedbackById[id].specificity}</p>
+      </div>
+    )}
+  </div>
             ))}
           </div>
         ))}
+
 
         <button
           onClick={handleMockFeedbackSubmit}
