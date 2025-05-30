@@ -1,95 +1,516 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
+import {
+  uploadResume,
+  reviewResumeIntern,
+  fetchMockInterviewQuestions,
+  fetchCompanyResearch,
+} from "../apiClient";
+import ResumeFeedback from "./ResumeFeedback";
+
+export default function InternshipPrep({ onBack }) {
+  const [showOptions, setShowOptions] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [file, setFile] = useState(null);
+  const [feedback, setFeedback] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // New fields for role & company for all API calls
+  const [role, setRole] = useState("");
+  const [company, setCompany] = useState("");
+
+  const centerContainer = {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    minHeight: "80vh",
+    width: "100vw",
+    paddingTop: "100px",
+    textAlign: "center",
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (role.trim() && company.trim()) {
+      setShowOptions(true);
+      setError(null);
+    } else {
+      setError("Please enter both role and company.");
+    }
+  };
+
+  const handleDrop = useCallback((event) => {
+    event.preventDefault();
+    const droppedFile = event.dataTransfer.files[0];
+    if (droppedFile) {
+      setFile(droppedFile);
+      setError(null);
+    }
+  }, []);
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+  };
+
+  // New states for parsed questions and user answers
+  const [mockQuestionsParsed, setMockQuestionsParsed] = useState({ TQ: [], BQ: [], CS: [] });
+  const [userAnswers, setUserAnswers] = useState({}); // { TQ1: '', BQ2: '', CS3: '' }
+  const [idealAnswers, setIdealAnswers] = useState(null);
+
+const parseQuestions = (rawText) => {
+  console.log("Raw stringified JSON from API:", rawText);
+
+  let parsedJSON = {};
+  try {
+    parsedJSON = JSON.parse(rawText); // Step 1: Parse stringified JSON
+    console.log("Parsed JSON object:", parsedJSON);
+  } catch (e) {
+    console.error("Failed to parse questions JSON:", e);
+    return { TQ: [], BQ: [], CS: [] };
+  }
+
+  const result = { TQ: [], BQ: [], CS: [] };
+
+  // Step 2: Extract questions
+  if (parsedJSON.technical) {
+    result.TQ = parsedJSON.technical.map((q, index) => ({
+      id: `TQ${index + 1}`,
+      question: q,
+    }));
+    console.log("Extracted Technical Questions:", result.TQ);
+  }
+
+  if (parsedJSON.behavioral) {
+    result.BQ = parsedJSON.behavioral.map((q, index) => ({
+      id: `BQ${index + 1}`,
+      question: q,
+    }));
+    console.log("Extracted Behavioral Questions:", result.BQ);
+  }
+
+  if (parsedJSON.case_study) {
+    result.CS = parsedJSON.case_study.map((q, index) => ({
+      id: `CS${index + 1}`,
+      question: q,
+    }));
+    console.log("Extracted Case Study Questions:", result.CS);
+  }
+
+  return result;
+};
+
+
+const handleMockInterview = async () => {
+  if (!role || !company) {
+    setError("Please enter both role and company for Mock Interview.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+  setMockQuestions("");
+  setMockQuestionsParsed({ TQ: [], BQ: [], CS: [] });
+  setUserAnswers({});
+  setIdealAnswers(null);
+
+  try {
+    const response = await fetchMockInterviewQuestions(role, company);
+    console.log("API full response:", response);
+
+    const rawQuestions = response.data.questions || "";
+    console.log("Raw `questions` field:", rawQuestions);
+
+    setMockQuestions(rawQuestions);
+
+    const parsed = parseQuestions(rawQuestions); // Properly parsed object
+    setMockQuestionsParsed(parsed);
+    console.log("Final Parsed Questions State:", parsed);
+  } catch (err) {
+    setError("Failed to fetch mock interview questions.");
+    console.error("API error:", err);
+  }
+
+  setLoading(false);
+};
+
+  // Handle user input for answers
+  const handleAnswerChange = (id, value) => {
+    setUserAnswers((prev) => ({
+      ...prev,
+      [id]: value,
+    }));
+  };
+
+  // Submit user answers to /mock-feedback API
+  const handleMockFeedbackSubmit = async () => {
+    if (Object.keys(userAnswers).length === 0) {
+      setError("Please answer at least one question before submitting.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setIdealAnswers(null);
+    try {
+      const response = await fetchMockFeedback(userAnswers, role, company);
+      // Assume response.data contains idealAnswers keyed by question ids
+      setIdealAnswers(response.data.idealAnswers || {});
+    } catch (err) {
+      setError("Failed to fetch ideal answers.");
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+
+  // Main handler to call API depending on selected option
+  const handleUpload = async () => {
+    if (!file) return alert("Please upload a resume file");
+    setLoading(true);
+    setError(null);
+    setFeedback("");
+
+    try {
+      if (selectedOption === "resume") {
+        const response = await uploadResume(file);
+        setFeedback(response.data.feedback || JSON.stringify(response.data, null, 2));
+      } else if (selectedOption === "resume-intern") {
+        const response = await reviewResumeIntern(file, role, company);
+        setFeedback(response.data.feedback || JSON.stringify(response.data, null, 2));
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to upload resume or fetch feedback");
+    }
+    setLoading(false);
+  };
+
+  // For Mock Interview
+  const [mockQuestions, setMockQuestions] = useState("");
+ 
+
+  // For Company Research
+  const [companyResearch, setCompanyResearch] = useState("");
+  const handleCompanyResearch = async () => {
+    if (!company || !role) {
+      setError("Please enter both company and role for Company Research.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setCompanyResearch("");
+    try {
+      const response = await fetchCompanyResearch(company, role);
+      setCompanyResearch(response.data.summary || JSON.stringify(response.data, null, 2));
+    } catch (err) {
+      setError("Failed to fetch company research.");
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <button
+        onClick={onBack}
+        style={{ marginBottom: 20, marginLeft: 20, padding: "5px 10px", cursor: "pointer" }}
+      >
+        &larr;
+      </button>
+      <div style={centerContainer}>
+        <h1>CareerPilot</h1>
+
+        {!showOptions && (
+          <>
+            <h3>Enter your internship details</h3>
+            <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 600 }}>
+              <input
+                type="text"
+                placeholder="Role (e.g. Software Engineering Intern)"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                style={{
+                  padding: 10,
+                  marginBottom: 10,
+                  width: "100%",
+                  borderRadius: 5,
+                  borderColor: "#ccc",
+                  fontSize: 16,
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Company Name"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                style={{
+                  padding: 10,
+                  marginBottom: 10,
+                  width: "100%",
+                  borderRadius: 5,
+                  borderColor: "#ccc",
+                  fontSize: 16,
+                }}
+              />
+              <button
+                type="submit"
+                style={{ marginTop: 15, padding: "10px 20px", cursor: "pointer" }}
+              >
+                Submit
+              </button>
+              {error && <p style={{ color: "red", marginTop: 10 }}>{error}</p>}
+            </form>
+          </>
+        )}
+
+        {showOptions && (
+          <>
+            <h3
+              style={{
+                width: "100%",
+                maxWidth: 600,
+                marginTop: 20,
+                padding: 10,
+                border: "1px solid #ccc",
+                borderRadius: 6,
+                maxHeight: 120,
+                overflowY: "auto",
+                textAlign: "left",
+              }}
+              title="Your entered internship info"
+            >
+              <b>Role:</b> {role} <br />
+              <b>Company:</b> {company}
+            </h3>
+
+            <div style={{ marginTop: 20, textAlign: "center" }}>
+              <button
+                style={{
+                  ...pillBtnStyle,
+                  ...(selectedOption === "company" ? pillBtnHover : {}),
+                }}
+                onClick={() => setSelectedOption("company")}
+              >
+                Company Research
+              </button>
+              <button
+                style={{
+                  ...pillBtnStyle,
+                  ...(selectedOption === "resume-intern" ? pillBtnHover : {}),
+                }}
+                onClick={() => setSelectedOption("resume-intern")}
+              >
+                Resume Review 
+              </button>
+              <button
+                style={{
+                  ...pillBtnStyle,
+                  ...(selectedOption === "mock" ? pillBtnHover : {}),
+                }}
+                onClick={() => setSelectedOption("mock")}
+              >
+                Mock Interview
+              </button>
+            </div>
+
+            {(selectedOption === "resume" || selectedOption === "resume-intern") && (
+              <div style={{ marginTop: 60, width: "100%", maxWidth: 800 }}>
+                <h2 style={{ fontSize: 24, marginBottom: 20 }}>
+                  📄 {selectedOption === "resume" ? "Resume Review" : "Resume Review (Intern)"}
+                </h2>
+
+                <div
+                  style={{
+                    border: "2px solid #3B82F6",
+                    borderRadius: 8,
+                    padding: "1.5rem",
+                    marginBottom: "1rem",
+                    textAlign: "center",
+                    cursor: "pointer",
+                  }}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onClick={() => document.getElementById("resume-file").click()}
+                  title="Drag & drop or click to upload your resume"
+                >
+                  {file ? (
+                    <p>
+                      Uploaded file: <b>{file.name}</b>
+                    </p>
+                  ) : (
+                    <p>Drag & drop your resume here, or click to select file</p>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  id="resume-file"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    if (e.target.files?.length) {
+                      setFile(e.target.files[0]);
+                      setError(null);
+                    }
+                  }}
+                />
+
+                <button
+                  onClick={handleUpload}
+                  style={{
+                    padding: "10px 30px",
+                    borderRadius: 6,
+                    border: "none",
+                    backgroundColor: "#3B82F6",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? "Processing..." : "Get Feedback"}
+                </button>
+
+                {error && <p style={{ color: "red", marginTop: 15 }}>{error}</p>}
+                {feedback && <ResumeFeedback feedback={feedback} />}
+              </div>
+            )}
+
+            {selectedOption === "mock" && (
+  <div style={{ marginTop: 60, width: "100%", maxWidth: 800 }}>
+    <h2 style={{ fontSize: 24, marginBottom: 20 }}>🎤 Mock Interview</h2>
+
+    <button
+      onClick={handleMockInterview}
+      style={{
+        padding: "10px 30px",
+        borderRadius: 6,
+        border: "none",
+        backgroundColor: "#3B82F6",
+        color: "white",
+        cursor: "pointer",
+        fontWeight: "bold",
+        marginBottom: 20,
+      }}
+      disabled={loading}
+    >
+      {loading ? "Loading Questions..." : "Generate Questions"}
+    </button>
+  
+
+    {mockQuestionsParsed.TQ.length + mockQuestionsParsed.BQ.length + mockQuestionsParsed.CS.length > 0 && (
+      <>
+        {["TQ", "BQ", "CS"].map((section) => (
+          <div key={section} style={{ marginBottom: 30 }}>
+            <h3 style={{ textAlign: "left", textTransform: "capitalize" }}>
+              {section === "TQ" ? "Technical Questions" : section === "BQ" ? "Behavioral Questions" : "Case Study"}
+            </h3>
+            {mockQuestionsParsed[section].map(({ id, question }) => (
+              <div key={id} style={{ marginBottom: 15, textAlign: "left" }}>
+                <p><b>{id}</b>: {question}</p>
+                <textarea
+                  rows={4}
+                  placeholder="Your answer..."
+                  style={{
+                    width: "100%",
+                    padding: 10,
+                    fontSize: 14,
+                    borderRadius: 6,
+                    borderColor: "#ccc",
+                    marginTop: 5,
+                  }}
+                  value={userAnswers[id] || ""}
+                  onChange={(e) => handleAnswerChange(id, e.target.value)}
+                />
+                {idealAnswers?.[id] && (
+                  <p style={{ marginTop: 5, backgroundColor: "#f3f4f6", padding: 10, borderRadius: 5 }}>
+                    <i>💡 Ideal Answer:</i> {idealAnswers[id]}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+
+        <button
+          onClick={handleMockFeedbackSubmit}
+          style={{
+            padding: "10px 30px",
+            borderRadius: 6,
+            border: "none",
+            backgroundColor: "#10B981",
+            color: "white",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+          disabled={loading}
+        >
+          {loading ? "Submitting..." : "Submit Answers"}
+        </button>
+      </>
+    )}
+
+    {error && <p style={{ color: "red", marginTop: 15 }}>{error}</p>}
+  </div>
+)}
+
+
+            {selectedOption === "company" && (
+              <div style={{ marginTop: 60, maxWidth: 800, width: "100%", textAlign: "center" }}>
+                <h2>Company Research</h2>
+                <button
+                  onClick={handleCompanyResearch}
+                  style={{
+                    padding: "10px 30px",
+                    borderRadius: 6,
+                    border: "none",
+                    backgroundColor: "#3B82F6",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    marginBottom: 20,
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? "Loading..." : "Get Company Info"}
+                </button>
+                {error && <p style={{ color: "red" }}>{error}</p>}
+                {companyResearch && (
+                  <pre
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      textAlign: "left",
+                    //   background: "#f4f4f4",
+                      borderRadius: 6,
+                      padding: 15,
+                      maxHeight: 400,
+                      overflowY: "auto",
+                    }}
+                  >
+                    {companyResearch}
+                  </pre>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
 
 const pillBtnStyle = {
-  borderRadius: 50,
   padding: "10px 20px",
-  border: "1px solid #007bff",
-  backgroundColor: "#fff",
-  color: "#007bff",
+  margin: "0 10px 20px 10px",
+  borderRadius: "30px",
+  border: "1.5px solid #3B82F6",
   cursor: "pointer",
-  margin: "0 10px",
-  fontWeight: "bold",
-  minWidth: 120,
+  fontWeight: "600",
+  color: "#3B82F6",
+  backgroundColor: "transparent",
   transition: "all 0.3s ease",
 };
 
 const pillBtnHover = {
-  backgroundColor: "#007bff",
-  color: "#fff",
+  backgroundColor: "#3B82F6",
+  color: "white",
 };
-
-export default function InternshipPrep({ internshipInfo, setInternshipInfo, onBack }) {
-  const [showOptions, setShowOptions] = useState(false);
-  const [hover, setHover] = useState(null);
-
-   const centerContainer = {
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "flex-start",  // Align near top vertically
-  alignItems: "center",          // Center horizontally
-  minHeight: "80vh", 
-    width: "100vw",                // full viewport width
-  paddingTop: "100px",            // Push content a bit down from top
-  textAlign: "center",
-
-};
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (internshipInfo.trim()) {
-      setShowOptions(true);
-    }
-  };
-
-  return (
-    <div style={centerContainer}>
-      <button onClick={onBack} style={{ marginBottom: 20 }}>
-        &larr; Back
-      </button>
-      <h1>CareerPilot</h1>
-      <h3>Tell us a bit about your internship</h3>
-      {!showOptions && (
-        <form onSubmit={handleSubmit}>
-          <textarea
-            rows={5}
-            style={{ width: "100%", padding: 10, fontSize: 16, borderRadius: 5, borderColor: "#ccc" }}
-            value={internshipInfo}
-            onChange={(e) => setInternshipInfo(e.target.value)}
-            placeholder="Write a brief description of the internship and company..."
-          />
-          <button type="submit" style={{ marginTop: 15, padding: "10px 20px", cursor: "pointer" }}>
-            Submit
-          </button>
-        </form>
-      )}
-      {showOptions && (
-        <div style={{ marginTop: 40, textAlign: "center" }}>
-          <button
-            style={{ ...pillBtnStyle, ...(hover === "company" ? pillBtnHover : {}) }}
-            onMouseEnter={() => setHover("company")}
-            onMouseLeave={() => setHover(null)}
-            onClick={() => alert("Company Research selected")}
-          >
-            Company Research
-          </button>
-          <button
-            style={{ ...pillBtnStyle, ...(hover === "resume" ? pillBtnHover : {}) }}
-            onMouseEnter={() => setHover("resume")}
-            onMouseLeave={() => setHover(null)}
-            onClick={() => alert("Resume Review selected")}
-          >
-            Resume Review
-          </button>
-          <button
-            style={{ ...pillBtnStyle, ...(hover === "mock" ? pillBtnHover : {}) }}
-            onMouseEnter={() => setHover("mock")}
-            onMouseLeave={() => setHover(null)}
-            onClick={() => alert("Mock Interview selected")}
-          >
-            Mock Interview
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}

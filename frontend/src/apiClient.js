@@ -1,13 +1,10 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: "http://127.0.0.1:8000", // Change if backend URL differs
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL: "http://127.0.0.1:8000",
 });
-const API_BASE_URL = "http://127.0.0.1:8000";
 
+// Review resume only (file)
 export async function uploadResume(file) {
   const formData = new FormData();
   formData.append("file", file);
@@ -16,24 +13,34 @@ export async function uploadResume(file) {
   });
 }
 
-
-export async function fetchMockInterviewQuestions(role) {
-  return apiClient.post("/mock-start", { role });
-}
-
-export async function submitMockFeedback(question, answer) {
+// Review resume for internship: file + role + company
+export async function reviewResumeIntern(file, role, company) {
   const formData = new FormData();
-  formData.append("question", question);
-  formData.append("answer", answer);
-  return apiClient.post("/mock-start", formData);
-}
-
-export async function submitCompanyResearch(companyInfo, internshipInfo, resumeFile) {
-  const formData = new FormData();
-  formData.append("company_info", companyInfo);
-  formData.append("internship_info", internshipInfo);
-  formData.append("file", resumeFile);
-  return apiClient.post("/company-chatbot", formData, {
+  formData.append("file", file);
+  formData.append("role", role);
+  formData.append("company", company);
+  return apiClient.post("/review-resume-intern", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 }
+
+// Mock interview: role + company (JSON)
+export async function fetchMockInterviewQuestions(role, company) {
+  const formData = new FormData();
+  formData.append("role", role);
+  formData.append("company", company);
+  return apiClient.post("/mock-interview", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+}
+
+// Company research: company + role (JSON)
+export async function fetchCompanyResearch(company, role) {
+  const formData = new FormData();    
+  formData.append("company", company);
+  formData.append("role", role);
+  return apiClient.post("/company-research", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+}
+
