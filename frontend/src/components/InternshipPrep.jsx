@@ -4,6 +4,7 @@ import {
   reviewResumeIntern,
   fetchMockInterviewQuestions,
   fetchCompanyResearch,
+  fetchMockFeedback
 } from "../apiClient";
 import ResumeFeedback from "./ResumeFeedback";
 
@@ -135,32 +136,83 @@ const handleMockInterview = async () => {
 };
 
   // Handle user input for answers
-  const handleAnswerChange = (id, value) => {
-    setUserAnswers((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
-  };
+  const handleAnswerChange = (questionText, answerText) => {
+  setUserAnswers((prev) => ({
+    ...prev,
+    [questionText]: answerText,
+  }));
+};
+
 
   // Submit user answers to /mock-feedback API
-  const handleMockFeedbackSubmit = async () => {
-    if (Object.keys(userAnswers).length === 0) {
-      setError("Please answer at least one question before submitting.");
-      return;
+const handleMockFeedbackSubmit = async () => {
+  if (Object.keys(userAnswers).length === 0) {
+    setError("Please answer at least one question before submitting.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+  setIdealAnswers(null);
+
+  try {
+    // Transform userAnswers into responses array
+    const responses = Object.entries(userAnswers).map(([question, answer]) => ({
+      question,
+      answer,
+    }));
+
+    const response = await fetchMockFeedback(company, role, responses);
+
+    // Assume response.data contains idealAnswers keyed by question ids
+    setIdealAnswers(response.data.idealAnswers || {});
+  } catch (err) {
+    setError("Failed to fetch ideal answers.");
+    console.error(err);
+  }
+
+  setLoading(false);
+};
+
+
+  const parseCompanyResearch = (data) => {
+  try {
+    if (!data || !data.summary) {
+      throw new Error('No summary field found in data');
     }
-    setLoading(true);
-    setError(null);
-    setIdealAnswers(null);
-    try {
-      const response = await fetchMockFeedback(userAnswers, role, company);
-      // Assume response.data contains idealAnswers keyed by question ids
-      setIdealAnswers(response.data.idealAnswers || {});
-    } catch (err) {
-      setError("Failed to fetch ideal answers.");
-      console.error(err);
-    }
-    setLoading(false);
-  };
+
+    // summary is a JSON string with extra spaces/newlines, so trim it first
+    const jsonString = data.summary.trim();
+
+    const parsed = JSON.parse(jsonString);
+
+    const splitLines = (text) =>
+      text
+        ? text
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+        : [];
+
+    return {
+      name: parsed.name || '',
+      industry: parsed.industry || '',
+      ceo: parsed.ceo || '',
+      employees: parsed.employees || '',
+      revenue: parsed.revenue || '',
+      description: parsed.description || '',
+      website: parsed.website || '',
+      best_practices: splitLines(parsed.best_practices),
+      role_expectations: splitLines(parsed.role_expectations),
+      interview_tips: splitLines(parsed.interview_tips),
+    };
+  } catch (error) {
+    console.error('Error parsing company research:', error);
+    return null;
+  }
+};
+
+
 
 
   // Main handler to call API depending on selected option
@@ -201,7 +253,8 @@ const handleMockInterview = async () => {
     setCompanyResearch("");
     try {
       const response = await fetchCompanyResearch(company, role);
-      setCompanyResearch(response.data.summary || JSON.stringify(response.data, null, 2));
+        console.log("API full response:", response);
+      setCompanyResearch(parseCompanyResearch(response.data));
     } catch (err) {
       setError("Failed to fetch company research.");
       console.error(err);
@@ -218,7 +271,7 @@ const handleMockInterview = async () => {
         &larr;
       </button>
       <div style={centerContainer}>
-        <h1>CareerPilot</h1>
+        <h1 >CareerPilot</h1>
 
         {!showOptions && (
           <>
@@ -316,7 +369,7 @@ const handleMockInterview = async () => {
             {(selectedOption === "resume" || selectedOption === "resume-intern") && (
               <div style={{ marginTop: 60, width: "100%", maxWidth: 800 }}>
                 <h2 style={{ fontSize: 24, marginBottom: 20 }}>
-                  📄 {selectedOption === "resume" ? "Resume Review" : "Resume Review (Intern)"}
+                  📄 {selectedOption === "resume" ? "Resume Review" : "Resume Review"}
                 </h2>
 
                 <div
@@ -395,7 +448,6 @@ const handleMockInterview = async () => {
     >
       {loading ? "Loading Questions..." : "Generate Questions"}
     </button>
-  
 
     {mockQuestionsParsed.TQ.length + mockQuestionsParsed.BQ.length + mockQuestionsParsed.CS.length > 0 && (
       <>
@@ -406,7 +458,7 @@ const handleMockInterview = async () => {
             </h3>
             {mockQuestionsParsed[section].map(({ id, question }) => (
               <div key={id} style={{ marginBottom: 15, textAlign: "left" }}>
-                <p><b>{id}</b>: {question}</p>
+                <p><b>{id}</b>: {typeof question === "object" ? JSON.stringify(question) : question}</p>
                 <textarea
                   rows={4}
                   placeholder="Your answer..."
@@ -422,10 +474,11 @@ const handleMockInterview = async () => {
                   onChange={(e) => handleAnswerChange(id, e.target.value)}
                 />
                 {idealAnswers?.[id] && (
-                  <p style={{ marginTop: 5, backgroundColor: "#f3f4f6", padding: 10, borderRadius: 5 }}>
-                    <i>💡 Ideal Answer:</i> {idealAnswers[id]}
-                  </p>
-                )}
+  <p style={{ marginTop: 5, backgroundColor: "#f3f4f6", padding: 10, borderRadius: 5 }}>
+    <i>💡 Ideal Answer:</i> {idealAnswers[id]}
+  </p>
+)}
+
               </div>
             ))}
           </div>
@@ -453,44 +506,64 @@ const handleMockInterview = async () => {
   </div>
 )}
 
-
             {selectedOption === "company" && (
-              <div style={{ marginTop: 60, maxWidth: 800, width: "100%", textAlign: "center" }}>
-                <h2>Company Research</h2>
-                <button
-                  onClick={handleCompanyResearch}
-                  style={{
-                    padding: "10px 30px",
-                    borderRadius: 6,
-                    border: "none",
-                    backgroundColor: "#3B82F6",
-                    color: "white",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    marginBottom: 20,
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? "Loading..." : "Get Company Info"}
-                </button>
-                {error && <p style={{ color: "red" }}>{error}</p>}
-                {companyResearch && (
-                  <pre
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      textAlign: "left",
-                    //   background: "#f4f4f4",
-                      borderRadius: 6,
-                      padding: 15,
-                      maxHeight: 400,
-                      overflowY: "auto",
-                    }}
-                  >
-                    {companyResearch}
-                  </pre>
-                )}
-              </div>
-            )}
+  <div style={{ marginTop: 60, maxWidth: 800, width: "100%", textAlign: "center" }}>
+    <h2> 🏢 Company Research</h2>
+    <button
+      onClick={handleCompanyResearch}
+      style={{
+        padding: "10px 30px",
+        borderRadius: 6,
+        border: "none",
+        backgroundColor: "#3B82F6",
+        color: "white",
+        cursor: "pointer",
+        fontWeight: "bold",
+        marginBottom: 20,
+      }}
+      disabled={loading}
+    >
+      {loading ? "Loading..." : "Get Company Info"}
+    </button>
+    {error && <p style={{ color: "red" }}>{error}</p>}
+    {companyResearch && (
+      <div style={{ textAlign: "left", padding: 20, borderRadius: 10 }}>
+        <h3>{companyResearch.name}</h3>
+        <p><strong>Industry:</strong> {companyResearch.industry}</p>
+        <p><strong>CEO:</strong> {companyResearch.ceo}</p>
+        <p><strong>Employees:</strong> {companyResearch.employees}</p>
+        <p><strong>Revenue:</strong> {companyResearch.revenue}</p>
+        <p><strong>Description:</strong> {companyResearch.description}</p>
+        <p><strong>Website:</strong> <a href={companyResearch.website} target="_blank" rel="noopener noreferrer">{companyResearch.website}</a></p>
+
+        <div style={{ marginTop: 20 }}>
+          <h4>Best Practices</h4>
+          <ul>
+            {(companyResearch?.best_practices || []).map((line, i) => (
+              <li key={i}>{line.replace(/^\d+\.\s*/, "")}</li>
+            ))}
+          </ul>
+
+          <h4>Role Expectations</h4>
+          <ul>
+            {(companyResearch?.role_expectations || []).map((line, i) => (
+              <li key={i}>{line.replace(/^\d+\.\s*/, "")}</li>
+            ))}
+          </ul>
+
+          <h4>Interview Tips</h4>
+          <ul>
+            {(companyResearch?.interview_tips || []).map((line, i) => (
+              <li key={i}>{line.replace(/^\d+\.\s*/, "")}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+
           </>
         )}
       </div>

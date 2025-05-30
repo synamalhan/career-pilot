@@ -5,10 +5,13 @@ from prompts import (
     review_resume_intern_prompt,
     mock_interview_prompt,
     company_research_prompt,
+    mock_feedback_prompt
 )
 import requests
 import os
 import fitz  # PyMuPDF
+from typing import List
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -26,6 +29,17 @@ app.add_middleware(
 )
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
+
+
+class QAItem(BaseModel):
+    question: str
+    answer: str
+
+class MockFeedbackRequest(BaseModel):
+    company: str
+    role: str
+    responses: List[QAItem]
+
 
 def call_ollama(prompt: str) -> str:
     payload = {
@@ -93,3 +107,18 @@ async def company_research(
     prompt = company_research_prompt.format(role=role, company=company)
     research_summary = call_ollama(prompt)
     return {"summary": research_summary}
+
+@app.post("/mock-feedback")
+async def mock_feedback(request: MockFeedbackRequest):
+    formatted_qa = "\n".join(
+        [f"Q: {item.question}\nA: {item.answer}" for item in request.responses]
+    )
+
+    prompt = mock_feedback_prompt.format(
+        company=request.company,
+        role=request.role,
+        qa_pairs=formatted_qa
+    )
+
+    feedback = call_ollama(prompt)
+    return {"feedback": feedback}

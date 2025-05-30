@@ -44,3 +44,17 @@ export async function fetchCompanyResearch(company, role) {
   });
 }
 
+// Mock feedback: company + role + list of Q&A (JSON)
+export async function fetchMockFeedback(company, role, responses) {
+  const payload = {
+    company,
+    role,
+    responses,
+  };
+
+  return apiClient.post("/mock-feedback", payload, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+}

@@ -42,4 +42,32 @@ give me the questions in a JSON format with the keys "technical", "behavioral", 
 company_research_prompt = """
 Provide a brief summary of the company "{company}" and the expectations for the role "{role}".
 Simulate a chatbot style response that can help the user prepare better for this internship.
+Give response in this format:
+{{
+  "name": "",
+  "industry": "",
+  "ceo": "",
+  "employees": "" ,
+  "revenue": "",
+  "description": "",
+  "website": "",
+  "best_practices": "",
+  "role_expectations": "",
+  "interview_tips": ""
+}}
+"""
+
+
+mock_feedback_prompt = """
+You are a career coach helping a candidate prepare for an interview with {company} for the role of {role}.
+
+Below is a list of mock interview questions and the candidate's corresponding answers. For each answer, evaluate:
+- How well the question was answered.
+- Any areas of improvement.
+- Whether the answer is specific, relevant, and compelling.
+
+Present your feedback question by question in a clear format.
+
+Questions and Answers:
+{qa_pairs}
 """
